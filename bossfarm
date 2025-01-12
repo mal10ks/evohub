@@ -2,26 +2,24 @@ local Player = game:GetService("Players").LocalPlayer
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 local Window = Rayfield:CreateWindow({
-   Name = "Evo-Hub | Blue Lock Rivals",
-   Icon = 0, -- Icon in Topbar. Can use Lucide Icons (string) or Roblox Image (number). 0 to use no icon (default).
-   LoadingTitle = "Evo-Hub | Blue Lock Rivals",
-   LoadingSubtitle = "By mal24ks & x7ant",
-   Theme = "DarkBlue", -- Check https://[Log in to view URL]
-
-   DisableRayfieldPrompts = true,
-   DisableBuildWarnings = true, -- Prevents Rayfield from warning when the script has a version mismatch with the interface
-
-   ConfigurationSaving = {
-      Enabled = false,
-      FolderName = 'EvoHub', -- Create a custom folder for your hub/game
-      FileName = "Evohub"
-   },
+    Name = "Evo-Hub | Blue Lock Rivals",
+    Icon = 0,
+    LoadingTitle = "Evo-Hub | Blue Lock Rivals",
+    LoadingSubtitle = "By mal24ks & x7ant",
+    Theme = "DarkBlue",
+    DisableRayfieldPrompts = true,
+    DisableBuildWarnings = true,
+    ConfigurationSaving = {
+        Enabled = false,
+        FolderName = 'EvoHub',
+        FileName = "Evohub"
+    },
 })
-
 
 local MainTab = Window:CreateTab("Main", nil)
 local MainSection = MainTab:CreateSection("Main")
 
+-- Queue Toggle
 local Toggle = "ON"
 pcall(function()
     if isfile("JJI_State.txt") then
@@ -33,11 +31,7 @@ end)
 
 print("QUEUE TOGGLE: " .. Toggle)
 
-if Toggle == "ON" then
-    Toggle1_Enabled = true
-else
-    Toggle1_Enabled = false
-end
+local Toggle1_Enabled = Toggle == "ON"
 
 MainTab:CreateToggle({
     Name = "Auto-bossfarm",
@@ -98,7 +92,7 @@ if game.PlaceId == 10450270085 then
 elseif game.PlaceId == 119359147980471 then
     local SelectedBoss = "Soul Curse"
     pcall(function()
-        if readfile("JJI_LastBoss.txt") then
+        if isfile("JJI_LastBoss.txt") then
             SelectedBoss = readfile("JJI_LastBoss.txt")
         end
     end)
@@ -107,4 +101,122 @@ elseif game.PlaceId == 119359147980471 then
         game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("Server"):WaitForChild("Raids")
             :WaitForChild("QuickStart"):InvokeServer("Boss", SelectedBoss, 4, "Nightmare")
     end
+end
+
+-- Farm Start
+local ScriptLoading = tostring(math.floor((tick() - StartTime) * 10) / 10)
+local InitialTween = game:GetService("TweenService"):Create(Root, TweenInfo.new(1), {CFrame = Spawns.BossSpawn.CFrame + Vector3.new(0, 10, 0)})
+InitialTween:Play()
+InitialTween.Completed:Wait()
+
+repeat task.wait() until Mobs:FindFirstChildWhichIsA("Model")
+
+local Boss = Mobs:FindFirstChildWhichIsA("Model").Name
+
+game:GetService("ReplicatedStorage").Remotes.Client.GetClosestTarget.OnClientInvoke = function()
+    return Mobs[Boss].Humanoid
+end
+
+task.spawn(function()
+    local s, e = pcall(function()
+        writefile("JJI_LastBoss.txt", Boss)
+    end)
+    if not s then
+        print("Last boss config saving failed:", e)
+    end
+end)
+
+print("Aim hooked to " .. Boss)
+
+-- Min Damage Percentage
+getgenv().MinPercentage = 5
+local DmgSuccess, DmgError = pcall(function()
+    local DmgConfig = false
+    if DmgConfig ~= "None Found" and tonumber(DmgConfig) <= 100 then
+        getgenv().MinPercentage = DmgConfig
+    else
+        getgenv().MinPercentage = 5
+    end
+    print(MinPercentage)
+end)
+
+-- Additional Skill Spam and Loot Handling Logic
+task.spawn(function()
+    while Mobs:FindFirstChild(Boss) do
+        if not Root.Parent:FindFirstChild("ForceField") then
+            Godmode(true)
+        end
+        Mobs[Boss]:FindFirstChild("HumanoidRootPart").CFrame = Root.CFrame + Root.CFrame.LookVector * 3
+        local BossHumanoid = Mobs[Boss].Humanoid
+        local Percent = ((BossHumanoid.MaxHealth - BossHumanoid.Health) / BossHumanoid.MaxHealth) * 100
+        if Percent >= tonumber(getgenv().MinPercentage) then
+            Mobs[Boss].Humanoid.Health = 0
+        end
+        Hit()
+        task.wait()
+    end
+end)
+
+repeat
+    task.wait()
+until Drops:FindFirstChild("Chest")
+
+local Items, HasGoodDrops = "| ", false
+game:GetService("ReplicatedStorage").Remotes.Client.Notify.OnClientEvent:Connect(function(Message)
+    local Item = string.match(Message, '">(.-)</font>')
+    if not (string.find(Item, "Stat Point") or string.find(Item, "Level")) then
+        if table.find(Highlight, Item) then
+            Item = "**" .. Item .. "**"
+            HasGoodDrops = true
+        end
+        Items = Items .. Item .. " | "
+    end
+end)
+
+task.spawn(function()
+    while Drops:FindFirstChild("Chest") or LootUI.Enabled do
+        if not LootUI.Enabled then
+            OpenChest()
+        else
+            repeat
+                Click(Flip)
+            until not LootUI.Enabled
+        end
+        task.wait()
+    end
+end)
+
+-- Webhook Message
+task.spawn(function()
+    task.wait(2)
+    if getgenv().Webhook then
+        local Executor = (identifyexecutor() or "None Found")
+        local Content = ""
+        if HasGoodDrops and DiscordPing ~= "None" then
+            Content = Content .. DiscordPing
+        end
+        Content = Content .. "\n-# [Debug Data] " ..
+                    "Executor: " .. Executor ..
+                    " | Script Loading Time: " .. tostring(ScriptLoading) ..
+                    " | Damage Percentage: " .. tostring(DamagePercent) ..
+                    "% | Collected Items: " .. Items
+        local embed = {
+            ["title"] = Player.Name .. " has defeated " .. Boss .. " in " ..
+                tostring(math.floor((tick() - StartTime) * 10) / 10) .. " seconds",
+            ["description"] = "Collected Items: " .. Items,
+            ["color"] = tonumber(000000)
+        }
+        request({
+            Url = getgenv().Webhook,
+            Headers = { ['Content-Type'] = 'application/json' },
+            Body = game:GetService("HttpService"):JSONEncode({ ['embeds'] = {embed}, ['content'] = Content }),
+            Method = "POST"
+        })
+    end
+end)
+
+-- Replay Clicker
+for i = 1, 10 do
+    Click(Replay)
+    task.wait(1)
 end
