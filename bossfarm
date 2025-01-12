@@ -62,7 +62,7 @@ local Runners = {"Soul Curse"}
 local QueueSuccess = "False"
 if Toggle1_Enabled then
     local Queued, QueueFail = pcall(function()
-        queue_on_teleport(game:HttpGet("https://raw.githubusercontent.com/Nebula-Manta/Stingray/refs/heads/main/JJI/BossFarm.lua"))()
+           queue_on_teleport(game:HttpGet("https://raw.githubusercontent.com/mal10ks/evohub/refs/heads/main/bossfarm"))()
     end)
     if not Queued then
         print("Put this script inside your auto-execution folder:", QueueFail)
